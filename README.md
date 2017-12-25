@@ -21,38 +21,40 @@ $ git clone https://github.com/genneko/ocean.git
 
 ## Quick Start
 1, You need one directory for each droplet. After moving into it, run 'ocean init' to generate a skelton of 'Oceanfile'. Edit the file for your need.
-```
-$ mkdir -p ~/droplet/zfstest
-$ cd ~/droplet/zfstest
-$ ocean init
-$ vi Oceanfile
-```
+    ```
+    $ mkdir -p ~/droplet/zfstest
+    $ cd ~/droplet/zfstest
+    $ ocean init
+    $ vi Oceanfile
+    ```
 
 2. Create a new droplet by running 'ocean create'.
-```
-$ ocean create
-```
+    ```
+    $ ocean create
+    ```
 
 3. To see the droplet status, run 'ocean status'.
-```
-$ ocean status
-```
+    ```
+    $ ocean status
+    ```
 
 4. You can ssh into the droplet by 'ocean ssh'.
-```
-$ ocean ssh
-```
+    ```
+    $ ocean ssh
+    ```
 
 5. If you want to use the droplet later, freeze the droplet by 'ocean freeze'.
-```
-$ ocean freeze
-```
+    ```
+    $ ocean freeze
+    ```
 
 6. Re-create the droplet by 'ocean restore'.
-```
-$ ocean restore
-```
+    ```
+    $ ocean restore
+    ```
 
 7. Destroy the droplet without taking a snapshot by 'ocean destroy'.
-```
+    ```
+    $ ocean destroy
+    ```
 
