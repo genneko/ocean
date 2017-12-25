@@ -20,7 +20,7 @@ $ git clone https://github.com/genneko/ocean.git
 ```
 
 ## Quick Start
-1, You need one directory for each droplet. After moving into it, run 'ocean init' to generate a skelton of 'Oceanfile'. Edit the file for your need.
+1. You need one directory for each droplet. After moving into it, run 'ocean init' to generate a skelton of 'Oceanfile'. Edit the file for your need.
     ```
     $ mkdir -p ~/droplet/zfstest
     $ cd ~/droplet/zfstest
