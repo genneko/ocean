@@ -1,0 +1,45 @@
+#!/bin/sh
+prog=$(basename $0)
+bindir=$(dirname $(readlink -f $0))
+libdir=$(dirname $bindir)/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "list list-summary summary id help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog list [args for doctl]
+    $OCEAN_COMMAND $prog list-summary
+    $OCEAN_COMMAND $prog summary <name>
+    $OCEAN_COMMAND $prog id <name>
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+cmd=$1
+shift
+case "$cmd" in
+	list)
+		doctl compute snapshot list "$@"
+		;;
+	list-summary)
+		doctl compute snapshot list --format ID,Name,CreatedAt,Size
+		;;
+	summary)
+		usage_exit_unless "$1"
+		doctl compute snapshot list "$1" --format ID,Name,CreatedAt,Size
+		#id=$($bindir/snapshot id "$1")
+		#if [ -n "$id" ]; then
+		#	doctl compute snapshot get "$id" --format ID,Name,CreatedAt,Size
+		#fi
+		;;
+	id)
+		usage_exit_unless "$1"
+		doctl compute snapshot list "$1" --format ID --no-header
+		;;
+	help|*)
+		usage_exit
+		;;
+esac

@@ -1,0 +1,17 @@
+# vim: ft=sh
+DOMAIN=example.com
+REGION=sgp1
+SIZE=512mb
+TTL=60
+IMAGESLUG=freebsd-11-1-x64-zfs
+#IMAGESNAP=zfstest-base
+SNAPNAME=zfstest-save
+VMNAME=zfstest
+SSHKEYS=
+SSHUSER=freebsd
+PROVISION="
+sudo env ASSUME_ALWAYS_YES=yes pkg install -y bash git
+sudo pw usermod -n freebsd -s /usr/local/bin/bash
+git clone https://github.com/genneko/dotfiles.git
+dotfiles/install.sh
+" # END-QUOTE

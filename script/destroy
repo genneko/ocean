@@ -1,0 +1,172 @@
+#!/bin/sh
+#
+# destroy (or freeze by specifying -F)
+#
+
+prog=$(basename $0)
+scriptdir=$(dirname $(readlink -f $0))
+bindir=$(dirname $scriptdir)
+libdir=$bindir/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "-n -D -F -d -S -N help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog [-n] [-D] [-d domain] [-N vmname]
+    $OCEAN_COMMAND $prog [-n] -F [-d domain] [-S snapname] [-N vmname]
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+test -f "$HOME/.oceanrc" && . "$HOME/.oceanrc"
+test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
+
+OPERATION="destroy"
+
+while getopts "nDFd:S:N:" opt
+do
+	case "$opt" in
+		n) DRYRUN=1 ;;
+		D) OPERATION="destroy" ;;
+		F) OPERATION="freeze" ;;
+		d) DOMAIN="$OPTARG" ;;
+		S) SNAPNAME="$OPTARG" ;;
+		N) VMNAME="$OPTARG" ;;
+		*) usage_exit ;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+if [ "$1" = "help" ]; then
+	usage_exit
+fi
+
+usage_exit_unless_defined VMNAME DOMAIN
+
+if [ "$OPERATION" = "freeze" ]; then
+	if [ -z "$SNAPNAME" ]; then
+		usage_exit "For freeze operation, specify SNAPNAME in ~/.oceanrc, ./Oceanfile or a command line."
+	fi
+fi
+
+FQDN=$VMNAME.$DOMAIN
+if [ "$OPERATION" = "freeze" ]; then
+	list_variable OPERATION FQDN VMNAME DOMAIN SNAPNAME DRYRUN
+else
+	list_variable OPERATION FQDN VMNAME DOMAIN DRYRUN
+fi
+echoerr
+
+if [ -n "$DRYRUN" ]; then
+	exit 0
+fi
+
+
+#
+# Get a droplet ID
+#
+dropletid=$($bindir/ocean vm id $FQDN)
+if [ -z "$dropletid" ]; then
+	err_exit "Cannot find a droplet ID for '$FQDN'."
+fi
+echoerr "Got droplet ID [$dropletid] for '$FQDN'."
+
+
+#
+# Check the droplet status and shutdown if it's running
+#
+dropletstatus=$($bindir/ocean vm status $FQDN)
+if [ -z "$dropletstatus" ]; then
+	err_exit "Cannot get droplet status for '$FQDN' ($dropletid)."
+elif [ "$dropletstatus" != "off" ]; then
+	echoerr "The droplet '$FQDN' ($dropletid) looks like running. Now going to shutdown."
+	$bindir/ocean vm shutdown $FQDN --wait >&2
+	sleep 20
+
+	dropletstatus=$($bindir/ocean vm status $FQDN)
+	if [ "$dropletstatus" != "off" ]; then
+		err_exit "The droplet '$FQDN' ($dropletid) is still running [$dropletstatus]. Try again later."
+	else
+		echoerr "The droplet '$FQDN' ($dropletid) was shutdown."
+	fi
+fi
+
+
+#
+# Take a snapshot
+#
+if [ "$OPERATION" = "freeze" -a -n "$SNAPNAME" ]; then
+	imageid=$($bindir/ocean snapshot id "$SNAPNAME")
+	if [ -n "$imageid" ]; then
+		echoerr "The specified snapshot '$SNAPNAME' ($imageid) already exists."
+		doctl compute snapshot delete $imageid >&2
+		sleep 5
+
+		imageid=$($bindir/ocean snapshot id "$SNAPNAME")
+		if [ -n "$imageid" ]; then
+			err_exit "Could not delete the snapshot '$SNAPNAME' ($imageid). Try again later."
+		else
+			echoerr "The snapshot '$SNAPNAME' was deleted."
+		fi
+	fi
+
+	echoerr
+	echoerr "Taking a snapshot for the droplet '$FQDN' ($dropletid)..."
+	echoerr
+	doctl compute droplet-action snapshot $dropletid --snapshot-name $SNAPNAME --wait >&2
+fi
+
+
+#
+# Delete the droplet
+#
+echoerr
+echoerr "Deleting the droplet '$FQDN' ($dropletid)..."
+echoerr
+doctl compute droplet delete $dropletid --force >&2
+sleep 5
+
+
+#
+# Delete a DNS A record for the droplet
+#
+recordid=$($bindir/ocean record id $FQDN)
+if [ -n "$recordid" ]; then
+	echoerr "Got a record id [$recordid] for the droplet '$FQDN'."
+	echoerr "Now deleting the record..."
+	doctl compute domain records delete $DOMAIN $recordid --force >&2
+else
+	echoerr "Cannot get a record id for the droplet '$FQDN'."
+fi
+
+sleep 5
+
+
+#
+# Delete SSH client's known_hosts entries.
+#
+echoerr
+echoerr "Deleting known_hosts entries for the droplet '$FQDN'..."
+echoerr
+ssh-keygen -R $FQDN
+
+
+#
+# Show summary
+#
+echoerr
+echoerr "SUMMARY"
+echoerr
+
+echoerr "[Droplets]"
+$bindir/ocean vm list-summary >&2
+echoerr
+
+echoerr "[DNS Records]"
+echoerr "Domain: $DOMAIN"
+$bindir/ocean record list-summary $DOMAIN >&2
+echoerr
+

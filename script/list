@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# list - list all droplets, snapshots and DNS records.
+#
+
+prog=$(basename $0)
+scriptdir=$(dirname $(readlink -f $0))
+bindir=$(dirname $scriptdir)
+libdir=$bindir/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "-n -d help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog [-n] [-d domain]
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+test -f "$HOME/.oceanrc" && . "$HOME/.oceanrc"
+test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
+
+OPERATION="list"
+
+while getopts "nd:" opt
+do
+	case "$opt" in
+		n) DRYRUN=1 ;;
+		d) DOMAIN="$OPTARG" ;;
+		*) usage_exit ;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+if [ "$1" = "help" ]; then
+	usage_exit
+fi
+
+usage_exit_unless_defined DOMAIN
+
+#
+list_variable OPERATION DOMAIN DRYRUN
+echoerr
+
+if [ -n "$DRYRUN" ]; then
+	exit 0
+fi
+
+
+echoerr "[Droplets]"
+$bindir/ocean vm list-summary >&2
+echoerr
+
+echoerr "[Snapshots]"
+$bindir/ocean snapshot list-summary >&2
+echoerr
+
+echoerr "[DNS Records]"
+echoerr "Domain: $DOMAIN"
+$bindir/ocean record list-summary $DOMAIN >&2
+echoerr
+

@@ -1,0 +1,33 @@
+# vim: ft=sh
+
+bindir=__BINDIR__
+cmddir=$bindir/command
+scpdir=$bindir/script
+
+_ocean () 
+{ 
+	local opts cur prev
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+	pprev="${COMP_WORDS[COMP_CWORD-2]}"
+	case "$pprev" in
+		vm|snapshot|image|ssh-key|record|create|destroy|restore|freeze|status|list)
+			opts=""
+			;;
+		*)
+			case "$prev" in
+				*ocean)
+					opts="$($bindir/ocean --list-command)"
+					;;
+				vm|snapshot|image|ssh-key|record|create|destroy|restore|freeze|status|list)
+					opts="$($bindir/ocean $prev --list-command)"
+					;;
+				*)
+					opts=""
+					;;
+			esac
+			;;
+	esac
+	COMPREPLY=( $(compgen -W "$opts" $cur) )
+}
+complete -F _ocean ocean

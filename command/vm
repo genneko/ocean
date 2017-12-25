@@ -1,0 +1,64 @@
+#!/bin/sh
+prog=$(basename $0)
+bindir=$(dirname $(readlink -f $0))
+libdir=$(dirname $bindir)/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "list list-summary summary id ip status power-on power-off power-cycle shutdown reboot help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog list [args for doctl]
+    $OCEAN_COMMAND $prog list-summary
+    $OCEAN_COMMAND $prog summary <name>
+    $OCEAN_COMMAND $prog id <name>
+    $OCEAN_COMMAND $prog ip <name>
+    $OCEAN_COMMAND $prog status <name>
+    $OCEAN_COMMAND $prog power-on <name>
+    $OCEAN_COMMAND $prog power-off <name>
+    $OCEAN_COMMAND $prog power-cycle <name>
+    $OCEAN_COMMAND $prog shutdown <name>
+    $OCEAN_COMMAND $prog reboot <name>
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+cmd=$1
+shift
+case "$cmd" in
+	list)
+		shift
+		doctl compute droplet list "$@"
+		;;
+	list-summary)
+		doctl compute droplet list --format ID,Name,PublicIPv4,Status
+		;;
+	summary)
+		usage_exit_unless "$1"
+		doctl compute droplet list "$1" --format ID,Name,PublicIPv4,Status
+		;;
+	id)
+		usage_exit_unless "$1"
+		doctl compute droplet list "$1" --format ID --no-header
+		;;
+	ip)
+		usage_exit_unless "$1"
+		doctl compute droplet list "$1" --format PublicIPv4 --no-header
+		;;
+	status|power-on|power-off|power-cycle|shutdown|reboot)
+		usage_exit_unless "$1"
+		id=$($bindir/vm id "$1")
+		if [ -n "$id" ]; then
+			if [ "$cmd" = "status" ]; then
+				doctl compute droplet get "$id" --format Status --no-header
+			else
+				doctl compute droplet-action $cmd "$id" --format Type,StartedAt,CompletedAt,Status --wait
+			fi
+		fi
+		;;
+	help|*)
+		usage_exit
+		;;
+esac

@@ -1,0 +1,172 @@
+#!/bin/sh
+#
+# create (or restore by specifying -R)
+#
+
+prog=$(basename $0)
+scriptdir=$(dirname $(readlink -f $0))
+bindir=$(dirname $scriptdir)
+libdir=$bindir/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "-n -C -R -d -r -s -t -I -i -S -N -k -u help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog [-n] [-C] [-d domain] [-r region] [-s size] [-t ttl] [-I imageslug | -i imagesnap] [-N vmname] [-k sshkeys] [-u sshuser]
+    $OCEAN_COMMAND $prog [-n] -R [-d domain] [-r region] [-s size] [-t ttl] [-S snapname] [-N vmname] [-k sshkeys] [-u sshuser]
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+test -f "$HOME/.oceanrc" && . "$HOME/.oceanrc"
+test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
+
+OPERATION="create"
+
+while getopts "nCRd:r:s:t:I:i:S:N:k:u:" opt
+do
+	case "$opt" in
+		n) DRYRUN=1 ;;
+		C) OPERATION="create" ;;
+		R) OPERATION="restore" ;;
+		d) DOMAIN="$OPTARG" ;;
+		r) REGION="$OPTARG" ;;
+		s) SIZE="$OPTARG" ;;
+		t) TTL="$OPTARG" ;;
+		I) IMAGESLUG="$OPTARG" ;;
+		i) IMAGESNAP="$OPTARG" ;;
+		S) SNAPNAME="$OPTARG" ;;
+		N) VMNAME="$OPTARG" ;;
+		k) SSHKEYS="$OPTARG" ;;
+		u) SSHUSER="$OPTARG" ;;
+		*) usage_exit ;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+if [ "$1" = "help" ]; then
+	usage_exit
+fi
+
+usage_exit_unless_defined VMNAME DOMAIN REGION SIZE TTL SSHUSER
+
+if [ "$OPERATION" = "create" ]; then
+	if [ -n "$IMAGESLUG" ]; then
+		IMAGETYPE="image"
+		IMAGENAME="$IMAGESLUG"
+	fi
+	if [ -n "$IMAGESNAP" ]; then
+		if [ -n "$IMAGESLUG" ]; then
+			usage_exit "IMAGESLUG and IMAGESNAP are mutually exclusive. Specify only one of them."
+		fi
+		IMAGETYPE="snapshot"
+		IMAGENAME="$IMAGESNAP"
+	fi
+	if [ -z "$IMAGENAME" ]; then
+		usage_exit "For create operation, specify IMAGESLUG or IMAGESNAP in ~/.oceanrc, ./Oceanfile or a command line."
+	fi
+elif [ "$OPERATION" = "restore" ]; then
+	if [ -z "$SNAPNAME" ]; then
+		usage_exit "For restore operation, specify SNAPNAME in ~/.oceanrc, ./Oceanfile or a command line."
+	fi
+	IMAGETYPE="snapshot"
+	IMAGENAME="$SNAPNAME"
+fi
+
+
+FQDN=$VMNAME.$DOMAIN
+list_variable IMAGESLUG IMAGESNAP SNAPNAME ---------- OPERATION IMAGETYPE IMAGENAME SSHUSER FQDN VMNAME DOMAIN SSHKEYS REGION SIZE TTL DRYRUN
+if [ "$OPERATION" = "create" ]; then
+	if [ -n "$PROVISION" ]; then
+		echoerr " PROVISION: yes"
+	else
+		echoerr " PROVISION: no"
+	fi
+fi
+echoerr
+
+if [ -n "$DRYRUN" ]; then
+	exit 0
+fi
+
+
+#
+# Check if the droplet was already created
+#
+dropletid=$($bindir/ocean vm id $FQDN)
+if [ -n "$dropletid" ]; then
+	err_exit "The droplet '$FQDN' already exists as [$dropletid]."
+fi
+
+
+#
+# Get an image ID
+#
+imageid=$($bindir/ocean $IMAGETYPE id "$IMAGENAME")
+if [ -z "$imageid" ]; then
+	err_exit "Cannot find an image ID for the $IMAGETYPE '$IMAGENAME'."
+fi
+echoerr "Got image ID [$imageid] for the $IMAGETYPE '$IMAGENAME'."
+
+
+#
+# Get a list of SSH key IDs
+#
+sshkeys=$($bindir/ocean ssh-key csv-id $SSHKEYS)
+if [ -z "$sshkeys" ]; then
+	err_exit "Cannot find ssh-key IDs for [$SSHKEYS]."
+fi
+echoerr "Got ssh-key IDs [$sshkeys] for [$SSHKEYS]."
+
+
+#
+# Create/Restore a droplet
+#
+echoerr "Now going to $OPERATION a droplet '$FQDN' from the $IMAGETYPE '$IMAGENAME' ($imageid)..."
+doctl compute droplet create $FQDN --image $imageid --region $REGION --size $SIZE --ssh-keys $sshkeys --format ID,Name,PublicIPv4,Status --wait >&2
+sleep 5
+
+
+#
+# Register a DNS A record for the droplet
+#
+ipaddr=$($bindir/ocean vm ip $FQDN)
+if [ -n "$ipaddr" ]; then
+	echoerr "Got an IP address [$ipaddr] of the droplet '$FQDN'."
+	echoerr "Now registering the IP address as $FQDN..."
+	doctl compute domain records create $DOMAIN --record-type A --record-name $VMNAME --record-data $ipaddr --record-ttl $TTL --format ID,Type,Name,Data,TTL >&2
+else
+	echoerr "Cannot get an IP adddress of the droplet '$FQDN'."
+fi
+
+sleep 5
+
+
+#
+# Run a provisioning script if any
+#
+if [ "$OPERATION" = "create" -a -n "$PROVISION" ]; then
+	echoerr "Running a provisioning script..."
+	$bindir/ocean ssh -o "-t" "$PROVISION"
+fi
+
+
+#
+# Show summary
+#
+echoerr
+echoerr "SUMMARY"
+echoerr
+
+echoerr "[Droplet]"
+$bindir/ocean vm summary $FQDN >&2
+echoerr
+
+echoerr "[DNS A Record]"
+echoerr "Domain: $DOMAIN"
+$bindir/ocean record summary $FQDN >&2
+echoerr
+

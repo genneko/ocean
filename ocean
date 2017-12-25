@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# ocean - a wrapper for the DigitalOcean's official CLI 'doctl'
+#
+prog=$(basename $0)
+bindir=$(dirname $(readlink -f $0))
+cmddir=$bindir/command
+scpdir=$bindir/script
+
+if [ "$1" = "--list-command" ]; then
+	echo "init create destroy restore freeze ssh status list vm snapshot image ssh-key record help"
+	exit 0
+fi
+
+. $bindir/lib/common.subr
+
+USAGE="usage:
+    $prog init
+    $prog create [<options>|help]
+    $prog destroy [<options>|help]
+    $prog restore [<options>|help]
+    $prog freeze [<options>|help]
+    $prog ssh [<options>|help]
+    $prog status [<options>|help]
+    $prog list [<options>|help]
+
+    $prog vm <subcommand>
+    $prog snapshot <subcommand>
+    $prog image <subcommand>
+    $prog ssh-key <subcommand>
+    $prog record <subcommand>
+
+    $prog help
+" # END-QUOTE
+
+cmd=$1
+shift
+case "$cmd" in
+	vm|snapshot|image|ssh-key|record)
+		OCEAN_COMMAND=$prog $cmddir/$cmd "$@"
+		;;
+	create|destroy|ssh|status|list)
+		OCEAN_COMMAND=$prog $scpdir/$cmd "$@"
+		;;
+	restore)
+		OCEAN_COMMAND=$prog $scpdir/create -R "$@"
+		;;
+	freeze)
+		OCEAN_COMMAND=$prog $scpdir/destroy -F "$@"
+		;;
+	init)
+		oceanfile="$(pwd)/Oceanfile"
+		if [ -e "$oceanfile" ]; then
+			msg_exit "Oceanfile already exists in the current directory."
+		elif [ "$(readlink -f $(pwd))" = "$bindir" ]; then
+			err_exit "You are in the program location. Use another directory."
+		else
+			cat $bindir/skel/Oceanfile > "$oceanfile"
+			msg_exit "Oceanfile was created in the current directory. Edit for your need."
+		fi
+		;;
+	completion)
+		escaped=$(echo $bindir | sed 's/\//\\\//g')
+		sed "s/__BINDIR__/$escaped/" $bindir/skel/completion.tmpl
+		;;
+	help|*)
+		usage_exit
+		;;
+esac
+exit 0

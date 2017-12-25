@@ -1,0 +1,82 @@
+# vim: ft=sh
+
+echoerr() {
+	echo "$@" >&2
+}
+
+_msg() {
+	local msg="$1"
+	if [ -n "$msg" ]; then
+		echoerr "$msg"
+	fi
+}
+
+_deref(){
+	local varname="$1"
+	value=$(eval echo \"\$$varname\")
+	if [ -n "$value" ]; then
+		echo "$value"
+	fi
+}
+
+msg_exit() {
+	_msg "$1"
+	exit 0
+}
+
+err_exit() {
+	_msg "$1"
+	exit 1
+}
+
+usage_exit() {
+	_msg "$1"
+	echoerr "$USAGE"
+	exit 1
+}
+
+usage_exit_unless (){
+	if [ -z "$1" ]; then
+		usage_exit
+	fi
+}
+
+usage_exit_unless_defined () {
+	for varname in "$@"
+	do
+		if [ -z "$varname" ]; then
+			continue
+		fi
+		value=$(_deref "$varname")
+		if [ -z "$value" ]; then
+			usage_exit "Specify $varname in ~/.oceanrc, ./Oceanfile or a command line."
+			break
+		fi
+	done
+}
+
+list_variable () {
+	for varname in "$@"
+	do
+		if [ -z "$varname" ]; then
+			continue
+		elif echo "$varname" | grep -q '^-' ; then
+			echoerr "$varname"
+			continue
+		fi
+		value=$(_deref "$varname")
+		line=$(printf "%10s: %s" "$varname" "$value")
+		echoerr "$line"
+	done
+}
+
+call_if_exists(){
+	local func="$1"
+	shift
+	if [ -n "$func" ]; then
+		if type $func > /dev/null 2>&1; then
+			$func "$@"
+		fi
+	fi
+}
+

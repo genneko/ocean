@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# status
+#
+
+prog=$(basename $0)
+scriptdir=$(dirname $(readlink -f $0))
+bindir=$(dirname $scriptdir)
+libdir=$bindir/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "-n -d -N help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog [-n] [-d domain] [-N vmname]
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+test -f "$HOME/.oceanrc" && . "$HOME/.oceanrc"
+test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
+
+OPERATION="status"
+
+while getopts "nd:N:" opt
+do
+	case "$opt" in
+		n) DRYRUN=1 ;;
+		d) DOMAIN="$OPTARG" ;;
+		N) VMNAME="$OPTARG" ;;
+		*) usage_exit ;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+if [ "$1" = "help" ]; then
+	usage_exit
+fi
+
+usage_exit_unless_defined VMNAME DOMAIN
+
+FQDN=$VMNAME.$DOMAIN
+list_variable OPERATION FQDN VMNAME DOMAIN DRYRUN
+echoerr
+
+if [ -n "$DRYRUN" ]; then
+	exit 0
+fi
+
+
+echoerr "[Droplet]"
+dropletid=$($bindir/ocean vm id $FQDN)
+if [ -z "$dropletid" ]; then
+	echoerr "Droplet '$FQDN' is not created."
+else
+	$bindir/ocean vm summary "$FQDN" >&2
+	#doctl compute droplet get $dropletid --format ID,Name,PublicIPv4,Status >&2
+fi
+
+echoerr
+echoerr "[Snapshot]"
+if [ -n "$SNAPNAME" ]; then
+	imageid=$($bindir/ocean snapshot id "$SNAPNAME")
+	if [ -z "$imageid" ]; then
+		echoerr "Snapshot '$SNAPNAME' doesn't exist."
+	else
+		$bindir/ocean snapshot summary "$SNAPNAME" >&2
+		#doctl compute snapshot get $imageid --format ID,Name,CreatedAt,Size >&2
+	fi
+else
+	echoerr "Snapshot for this droplet is not specified."
+fi
+
+echoerr
+echoerr "[DNS A Record]"
+recordid=$($bindir/ocean record id $FQDN)
+if [ -n "$recordid" ]; then
+	echoerr "Domain: $DOMAIN"
+	$bindir/ocean record summary $FQDN >&2
+else
+	echoerr "No DNS A record for '$FQDN'."
+fi
+
+echoerr
+

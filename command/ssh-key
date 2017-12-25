@@ -1,0 +1,52 @@
+#!/bin/sh
+prog=$(basename $0)
+bindir=$(dirname $(readlink -f $0))
+libdir=$(dirname $bindir)/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "list id csv csvid csv-id help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog list [args for doctl]
+    $OCEAN_COMMAND $prog id <name>
+    $OCEAN_COMMAND $prog csv|csvid|csv-id [<name>,...]
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+_lines_to_csv (){
+	awk '{ ORS=","; print } END{ print "\n" }' | sed 's/,$//'
+}
+
+_select_by_names (){
+	local regexp="^("$(echo -n "$1" | sed 's/,/\|/g')')$'
+	awk "\$2 ~ /$regexp/{print \$1}"
+}
+_select_by_name (){
+	awk "\$2 == \"$1\"{print \$1}"
+}
+
+cmd=$1
+shift
+case "$cmd" in
+	list)
+		doctl compute ssh-key list "$@"
+		;;
+	csv|csvid|csv-id)
+		if [ -n "$1" ]; then
+			doctl compute ssh-key list | _select_by_names "$1" | _lines_to_csv
+		else
+			doctl compute ssh-key list --no-header --format ID | _lines_to_csv
+		fi
+		;;
+	id)
+		usage_exit_unless "$1"
+		doctl compute ssh-key list | _select_by_name "$1"
+		;;
+	help|*)
+		usage_exit
+		;;
+esac

@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# ssh - ssh to vm
+#
+
+prog=$(basename $0)
+scriptdir=$(dirname $(readlink -f $0))
+bindir=$(dirname $scriptdir)
+libdir=$bindir/lib
+
+if [ "$1" = "--list-command" ]; then
+	echo "-n -d -N -u -o help"
+	exit 0
+fi
+
+. $libdir/common.subr
+
+USAGE="usage:
+    $OCEAN_COMMAND $prog [-n] [-d domain] [-N vmname] [-u sshuser] [-o options for ssh]
+    $OCEAN_COMMAND $prog help
+" # END-QUOTE
+
+test -f "$HOME/.oceanrc" && . "$HOME/.oceanrc"
+test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
+
+OPERATION="ssh"
+
+while getopts "nd:N:u:o:" opt
+do
+	case "$opt" in
+		n) DRYRUN=1 ;;
+		d) DOMAIN="$OPTARG" ;;
+		N) VMNAME="$OPTARG" ;;
+		u) SSHUSER="$OPTARG" ;;
+		o) SSHOPTS="$OPTARG" ;;
+		*) usage_exit ;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+if [ "$1" = "help" ]; then
+	usage_exit
+fi
+
+usage_exit_unless_defined VMNAME DOMAIN SSHUSER
+
+FQDN=$VMNAME.$DOMAIN
+list_variable OPERATION SSHUSER FQDN VMNAME DOMAIN DRYRUN
+echoerr
+
+if [ -n "$DRYRUN" ]; then
+	exit 0
+fi
+
+
+#
+# Check the droplet status
+#
+dropletstatus=$($bindir/ocean vm status $FQDN)
+if [ -z "$dropletstatus" ]; then
+	err_exit "Cannot get droplet status for '$FQDN'."
+elif [ "$dropletstatus" == "active" ]; then
+	echoerr "Droplet '$FQDN' looks like running."
+	ipaddr=$($bindir/ocean vm ip $FQDN)
+	if [ -n "$ipaddr" ]; then
+		echoerr "Got an IP address [$ipaddr] of the droplet '$FQDN'."
+		ssh -o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null" $SSHOPTS $SSHUSER@$ipaddr "$@"
+	else
+		echoerr "Cannot get IP adddress of the droplet '$FQDN'. Using a FQDN..."
+		ssh -o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null" $SSHOPTS $SSHUSER@$FQDN "$@"
+	fi
+else
+	err_exit "The droplet '$FQDN' doesn't seem running. Its status is [$dropletstatus]."
+fi
+
