@@ -21,6 +21,8 @@ $ git clone https://github.com/genneko/ocean.git
 
 ## Quick Start
 1. You need one directory for each droplet. After moving into it, run 'ocean init' to generate a skelton of 'Oceanfile'. Edit the file for your need.
+
+    See [Configuration parameters](#configuration-parameters) for details.
     ```
     $ mkdir -p ~/droplet/zfstest
     $ cd ~/droplet/zfstest
@@ -58,3 +60,47 @@ $ git clone https://github.com/genneko/ocean.git
     $ ocean destroy
     ```
 
+## Configuration parameters
+- REGION
+
+    region to use for the droplet.
+    
+- SIZE
+
+    size of the droplet.
+
+- TTL
+
+    TTL of a DNS A record for the droplet.
+
+- DOMAIN
+
+    Your domain which are being managed by the DigitalOcean's DNS.
+
+- VMNAME
+
+    Shoft name of the droplet. Its FQDN is $VMNAME.$DOMAIN.
+
+- IMAGESLUG
+
+    Image-slug used to create a new droplet.
+
+- IMAGESNAP
+
+    Name of a snapshot used to create a new droplet.
+
+- SNAPNAME
+
+    Name of a snapshot used to save an existing droplet state.
+
+- SSHKEYS
+
+    Comma-separated list of SSH key names which are store in the DigitalOcean cloud.
+
+- SSHUSER
+
+    Default username of the droplet.
+
+- PROVISION
+
+    String of commands which are executed as a provisioning script.
