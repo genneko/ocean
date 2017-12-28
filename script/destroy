@@ -165,6 +165,17 @@ echoerr "[Droplets]"
 $bindir/ocean vm list-summary >&2
 echoerr
 
+if [ "$OPERATION" = "freeze" -a -n "$SNAPNAME" ]; then
+	echoerr "[Snapshot]"
+        imageid=$($bindir/ocean snapshot id "$SNAPNAME")
+        if [ -z "$imageid" ]; then
+                echoerr "Snapshot '$SNAPNAME' doesn't exist."
+        else
+                $bindir/ocean snapshot summary "$SNAPNAME" >&2
+        fi
+	echoerr
+fi
+
 echoerr "[DNS Records]"
 echoerr "Domain: $DOMAIN"
 $bindir/ocean record list-summary $DOMAIN >&2
