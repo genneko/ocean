@@ -1,7 +1,7 @@
 # vim: ft=sh
 DOMAIN=example.com
 REGION=sgp1
-SIZE=512mb
+SIZE=s-1vcpu-1gb
 TTL=60
 IMAGESLUG=freebsd-11-1-x64-zfs
 #IMAGESNAP=zfstest-base
