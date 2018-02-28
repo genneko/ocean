@@ -84,14 +84,24 @@ if [ -z "$dropletstatus" ]; then
 elif [ "$dropletstatus" != "off" ]; then
 	echoerr "The droplet '$FQDN' ($dropletid) looks like running. Now going to shutdown."
 	$bindir/ocean vm shutdown $FQDN --wait >&2
-	sleep 20
 
-	dropletstatus=$($bindir/ocean vm status $FQDN)
-	if [ "$dropletstatus" != "off" ]; then
-		err_exit "The droplet '$FQDN' ($dropletid) is still running [$dropletstatus]. Try again later."
-	else
-		echoerr "The droplet '$FQDN' ($dropletid) was shutdown."
-	fi
+	_count=0
+	_prefix=
+	while true; do
+		sleep 5
+		dropletstatus=$($bindir/ocean vm status $FQDN)
+		echoerr -n ${_prefix:-"Waiting for shutdown: "}$dropletstatus
+		_prefix=", "
+		if [ "$dropletstatus" = "off" ]; then
+			break
+		fi
+		_count=$(expr $_count + 1)
+		if [ $_count -gt 10 ]; then
+			err_exit "The droplet '$FQDN' ($dropletid) is still running [$dropletstatus]. Try again later."
+		fi
+	done
+	echoerr
+	echoerr "The droplet '$FQDN' ($dropletid) was successfully shutdown."
 fi
 
 
