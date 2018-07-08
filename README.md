@@ -101,6 +101,10 @@ $ git clone https://github.com/genneko/ocean.git
 
     Default username of the droplet.
 
+- OPTIONS
+
+    Droplet creation options such as --enable-ipv6.
+
 - PROVISION
 
     String of commands which are executed as a provisioning script.

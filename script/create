@@ -16,8 +16,8 @@ fi
 . $libdir/common.subr
 
 USAGE="usage:
-    $OCEAN_COMMAND $prog [-n] [-C] [-d domain] [-r region] [-s size] [-t ttl] [-I imageslug | -i imagesnap] [-N vmname] [-k sshkeys] [-u sshuser]
-    $OCEAN_COMMAND $prog [-n] -R [-d domain] [-r region] [-s size] [-t ttl] [-S snapname] [-N vmname] [-k sshkeys] [-u sshuser]
+    $OCEAN_COMMAND $prog [-n] [-C] [-d domain] [-r region] [-s size] [-t ttl] [-I imageslug | -i imagesnap] [-N vmname] [-k sshkeys] [-u sshuser] [-o options]
+    $OCEAN_COMMAND $prog [-n] -R [-d domain] [-r region] [-s size] [-t ttl] [-S snapname] [-N vmname] [-k sshkeys] [-u sshuser] [-o options]
     $OCEAN_COMMAND $prog help
 " # END-QUOTE
 
@@ -26,7 +26,7 @@ test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
 
 OPERATION="create"
 
-while getopts "nCRd:r:s:t:I:i:S:N:k:u:" opt
+while getopts "nCRd:r:s:t:I:i:S:N:k:u:o:" opt
 do
 	case "$opt" in
 		n) DRYRUN=1 ;;
@@ -42,6 +42,7 @@ do
 		N) VMNAME="$OPTARG" ;;
 		k) SSHKEYS="$OPTARG" ;;
 		u) SSHUSER="$OPTARG" ;;
+		o) OPTIONS="$OPTARG" ;;
 		*) usage_exit ;;
 	esac
 done
@@ -78,7 +79,7 @@ fi
 
 
 FQDN=$VMNAME.$DOMAIN
-list_variable IMAGESLUG IMAGESNAP SNAPNAME ---------- OPERATION IMAGETYPE IMAGENAME SSHUSER FQDN VMNAME DOMAIN SSHKEYS REGION SIZE TTL DRYRUN
+list_variable IMAGESLUG IMAGESNAP SNAPNAME ---------- OPERATION IMAGETYPE IMAGENAME SSHUSER FQDN VMNAME DOMAIN SSHKEYS REGION SIZE TTL DRYRUN OPTIONS
 if [ "$OPERATION" = "create" ]; then
 	if [ -n "$PROVISION" ]; then
 		echoerr " PROVISION: yes"
@@ -126,7 +127,7 @@ echoerr "Got ssh-key IDs [$sshkeys] for [$SSHKEYS]."
 # Create/Restore a droplet
 #
 echoerr "Now going to $OPERATION a droplet '$FQDN' from the $IMAGETYPE '$IMAGENAME' ($imageid)..."
-doctl compute droplet create $FQDN --image $imageid --region $REGION --size $SIZE --ssh-keys $sshkeys --format ID,Name,PublicIPv4,Status --wait >&2
+doctl compute droplet create $FQDN --image $imageid --region $REGION --size $SIZE --ssh-keys $sshkeys --format ID,Name,PublicIPv4,PublicIPv6,Status --wait $OPTIONS >&2
 sleep 5
 
 

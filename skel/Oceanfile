@@ -9,6 +9,7 @@ SNAPNAME=zfstest-save
 VMNAME=zfstest
 SSHKEYS=
 SSHUSER=freebsd
+OPTIONS=--enable-ipv6
 PROVISION="
 sudo env ASSUME_ALWAYS_YES=yes pkg install -y bash git
 sudo pw usermod -n freebsd -s /usr/local/bin/bash
