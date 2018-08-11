@@ -77,6 +77,10 @@ $ git clone https://github.com/genneko/ocean.git
 
     Your domain which are being managed by the DigitalOcean's DNS.
 
+- NODNS
+
+    If set to 1 or greater, ocean create/destroy does not add/remove DNS record for the droplet.
+
 - VMNAME
 
     Shoft name of the droplet. Its FQDN is $VMNAME.$DOMAIN.

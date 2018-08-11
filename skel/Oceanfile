@@ -1,5 +1,6 @@
 # vim: ft=sh
 DOMAIN=example.com
+NODNS=0
 REGION=sgp1
 SIZE=s-1vcpu-1gb
 TTL=60

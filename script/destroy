@@ -9,15 +9,15 @@ bindir=$(dirname $scriptdir)
 libdir=$bindir/lib
 
 if [ "$1" = "--list-command" ]; then
-	echo "-n -D -F -d -S -N help"
+	echo "-n -D -F -X -d -S -N help"
 	exit 0
 fi
 
 . $libdir/common.subr
 
 USAGE="usage:
-    $OCEAN_COMMAND $prog [-n] [-D] [-d domain] [-N vmname]
-    $OCEAN_COMMAND $prog [-n] -F [-d domain] [-S snapname] [-N vmname]
+    $OCEAN_COMMAND $prog [-n] [-D] [-X] [-d domain] [-N vmname]
+    $OCEAN_COMMAND $prog [-n] -F [-X] [-d domain] [-S snapname] [-N vmname]
     $OCEAN_COMMAND $prog help
 " # END-QUOTE
 
@@ -26,12 +26,13 @@ test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
 
 OPERATION="destroy"
 
-while getopts "nDFd:S:N:" opt
+while getopts "nDFXd:S:N:" opt
 do
 	case "$opt" in
 		n) DRYRUN=1 ;;
 		D) OPERATION="destroy" ;;
 		F) OPERATION="freeze" ;;
+		X) NODNS=1 ;;
 		d) DOMAIN="$OPTARG" ;;
 		S) SNAPNAME="$OPTARG" ;;
 		N) VMNAME="$OPTARG" ;;
@@ -54,9 +55,9 @@ fi
 
 FQDN=$VMNAME.$DOMAIN
 if [ "$OPERATION" = "freeze" ]; then
-	list_variable OPERATION FQDN VMNAME DOMAIN SNAPNAME DRYRUN
+	list_variable OPERATION FQDN VMNAME DOMAIN NODNS SNAPNAME DRYRUN
 else
-	list_variable OPERATION FQDN VMNAME DOMAIN DRYRUN
+	list_variable OPERATION FQDN VMNAME DOMAIN NODNS DRYRUN
 fi
 echoerr
 
@@ -148,16 +149,20 @@ sleep 5
 #
 # Delete a DNS A record for the droplet
 #
-recordid=$($bindir/ocean record id $FQDN)
-if [ -n "$recordid" ]; then
-	echoerr "Got a record id [$recordid] for the droplet '$FQDN'."
-	echoerr "Now deleting the record..."
-	doctl compute domain records delete $DOMAIN $recordid --force >&2
+if [ "$NODNS" -ge 1 ]; then
+	echoerr "No need to delete a DNS record."
 else
-	echoerr "Cannot get a record id for the droplet '$FQDN'."
-fi
+	recordid=$($bindir/ocean record id $FQDN)
+	if [ -n "$recordid" ]; then
+		echoerr "Got a record id [$recordid] for the droplet '$FQDN'."
+		echoerr "Now deleting the record..."
+		doctl compute domain records delete $DOMAIN $recordid --force >&2
+	else
+		echoerr "Cannot get a record id for the droplet '$FQDN'."
+	fi
 
-sleep 5
+	sleep 5
+fi
 
 
 #
@@ -182,12 +187,12 @@ echoerr
 
 if [ "$OPERATION" = "freeze" -a -n "$SNAPNAME" ]; then
 	echoerr "[Snapshot]"
-        imageid=$($bindir/ocean snapshot id "$SNAPNAME")
-        if [ -z "$imageid" ]; then
-                echoerr "Snapshot '$SNAPNAME' doesn't exist."
-        else
-                $bindir/ocean snapshot summary "$SNAPNAME" >&2
-        fi
+	imageid=$($bindir/ocean snapshot id "$SNAPNAME")
+	if [ -z "$imageid" ]; then
+		echoerr "Snapshot '$SNAPNAME' doesn't exist."
+	else
+		$bindir/ocean snapshot summary "$SNAPNAME" >&2
+	fi
 	echoerr
 fi
 

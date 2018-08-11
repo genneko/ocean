@@ -9,15 +9,15 @@ bindir=$(dirname $scriptdir)
 libdir=$bindir/lib
 
 if [ "$1" = "--list-command" ]; then
-	echo "-n -C -R -d -r -s -t -I -i -S -N -k -u help"
+	echo "-n -C -R -X -d -r -s -t -I -i -S -N -k -u help"
 	exit 0
 fi
 
 . $libdir/common.subr
 
 USAGE="usage:
-    $OCEAN_COMMAND $prog [-n] [-C] [-d domain] [-r region] [-s size] [-t ttl] [-I imageslug | -i imagesnap] [-N vmname] [-k sshkeys] [-u sshuser] [-o options]
-    $OCEAN_COMMAND $prog [-n] -R [-d domain] [-r region] [-s size] [-t ttl] [-S snapname] [-N vmname] [-k sshkeys] [-u sshuser] [-o options]
+    $OCEAN_COMMAND $prog [-n] [-C] [-X] [-d domain] [-r region] [-s size] [-t ttl] [-I imageslug | -i imagesnap] [-N vmname] [-k sshkeys] [-u sshuser] [-o options]
+    $OCEAN_COMMAND $prog [-n] -R [-X] [-d domain] [-r region] [-s size] [-t ttl] [-S snapname] [-N vmname] [-k sshkeys] [-u sshuser] [-o options]
     $OCEAN_COMMAND $prog help
 " # END-QUOTE
 
@@ -26,12 +26,13 @@ test -f "$(pwd)/Oceanfile" && . "$(pwd)/Oceanfile"
 
 OPERATION="create"
 
-while getopts "nCRd:r:s:t:I:i:S:N:k:u:o:" opt
+while getopts "nCRXd:r:s:t:I:i:S:N:k:u:o:" opt
 do
 	case "$opt" in
 		n) DRYRUN=1 ;;
 		C) OPERATION="create" ;;
 		R) OPERATION="restore" ;;
+		X) NODNS=1 ;;
 		d) DOMAIN="$OPTARG" ;;
 		r) REGION="$OPTARG" ;;
 		s) SIZE="$OPTARG" ;;
@@ -79,7 +80,7 @@ fi
 
 
 FQDN=$VMNAME.$DOMAIN
-list_variable IMAGESLUG IMAGESNAP SNAPNAME ---------- OPERATION IMAGETYPE IMAGENAME SSHUSER FQDN VMNAME DOMAIN SSHKEYS REGION SIZE TTL DRYRUN OPTIONS
+list_variable IMAGESLUG IMAGESNAP SNAPNAME ---------- OPERATION IMAGETYPE IMAGENAME SSHUSER FQDN VMNAME DOMAIN NODNS SSHKEYS REGION SIZE TTL DRYRUN OPTIONS
 if [ "$OPERATION" = "create" ]; then
 	if [ -n "$PROVISION" ]; then
 		echoerr " PROVISION: yes"
@@ -134,16 +135,20 @@ sleep 5
 #
 # Register a DNS A record for the droplet
 #
-ipaddr=$($bindir/ocean vm ip $FQDN)
-if [ -n "$ipaddr" ]; then
-	echoerr "Got an IP address [$ipaddr] of the droplet '$FQDN'."
-	echoerr "Now registering the IP address as $FQDN..."
-	doctl compute domain records create $DOMAIN --record-type A --record-name $VMNAME --record-data $ipaddr --record-ttl $TTL --format ID,Type,Name,Data,TTL >&2
+if [ "$NODNS" -ge 1 ]; then
+	echoerr "No need to add a DNS record."
 else
-	echoerr "Cannot get an IP adddress of the droplet '$FQDN'."
-fi
+	ipaddr=$($bindir/ocean vm ip $FQDN)
+	if [ -n "$ipaddr" ]; then
+		echoerr "Got an IP address [$ipaddr] of the droplet '$FQDN'."
+		echoerr "Now registering the IP address as $FQDN..."
+		doctl compute domain records create $DOMAIN --record-type A --record-name $VMNAME --record-data $ipaddr --record-ttl $TTL --format ID,Type,Name,Data,TTL >&2
+	else
+		echoerr "Cannot get an IP adddress of the droplet '$FQDN'."
+	fi
 
-sleep 5
+	sleep 5
+fi
 
 
 #
