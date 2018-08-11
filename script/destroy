@@ -149,7 +149,7 @@ sleep 5
 #
 # Delete a DNS A record for the droplet
 #
-if [ "$NODNS" -ge 1 ]; then
+if [ ${NODNS:-0} -ge 1 ]; then
 	echoerr "No need to delete a DNS record."
 else
 	recordid=$($bindir/ocean record id $FQDN)

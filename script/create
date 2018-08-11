@@ -135,7 +135,7 @@ sleep 5
 #
 # Register a DNS A record for the droplet
 #
-if [ "$NODNS" -ge 1 ]; then
+if [ ${NODNS:-0} -ge 1 ]; then
 	echoerr "No need to add a DNS record."
 else
 	ipaddr=$($bindir/ocean vm ip $FQDN)
